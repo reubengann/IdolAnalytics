@@ -1,0 +1,116 @@
+IdolAnalytics DB
+
+The mysql database used to run models from IdolAnalytics.
+
+BillboardSongs
+--------------
+
+All songs from the Hot 100, 1890-2015, all songs found played on the radio in the Statistical Snapshot of American Radio, and every song ever sung on American Idol. Compiled from the Whitburn spreadsheet and from my own data mining. Note that there are songs found on the SSAR that did not chart. In that case, many fields are null. This refers to the compiled list found on USENET, updated regularly. It was current as of the beginning of 2015, but I have not maintained it since.
+
+Fields:
+ID: Unique internal ID
+Track: Name of the track. Articles (a or the) moved to the end
+Artist: Artist field. Articles (a or the) moved to the end. If the artist had a 'featuring', this is given in a separate field, not this one. The artist listed first is in this field.
+YearOfRanking: The official year the track was ranked (NOT the year of release)
+YearlyRank: The rank the track had for the entire year, as rated by Billboard
+WeeksCharted: Number of weeks on the Hot 100
+Charted40OrBetter: Number of weeks the track was in the Top 40
+Charted10OrBetter: Number of weeks the track was in the Top 10
+WeeksAtHighestPosition: self-explanatory
+HighestPosition: self-explanatory
+Length: Track length as a string (example 4:30)
+Genre: When listed
+Date Peaked: datetime field of the highest Billboard Rank (if any)
+Artist 2: anyone credited after the first artist
+Cover: whether the track was a cover song or not (1 or 0) (when known)
+Release Date: when known
+Notes: self-explanatory
+Original: If this song is a cover song, contains the unique ID of the original song in the database (when known)
+Field1: Genuinely don't remember
+TimesPlayed2013: The number of times I found the song played on the sampled radio stations in the entirety of 2013
+Whitburn_ID: How the Whitburn list refers to the track. Note that this is subject to change.
+WhitburnScore: The score of popularity assigned in the Whitburn list (based on a simple formula)
+
+Contestants
+------------
+
+All contestants on American Idol
+
+ID: Unique ID
+Name: Contestant name as refered to during the show
+Season: self-explanatory
+Hometown: when known
+Age at start: self-explanatory
+Sex: M or F
+DOB: datetime (when known)
+Pre-exposure: In seconds, the amount of time the contestant was shown in the auditions (non-voting shows)
+Audition: 1 or 0, whether the contestant's audition was shown before voting shows
+Finals: 1 or 0, whether the contestant made the finals
+Sales: was to hold sales figures for the artist post-Idol, but I never completed the project
+PicURL: the url to the headshot of the person
+RaceCode: coded racial makeup of contestants (if not provided, I guessed). Follows the standard CDC classification: http://www.cdc.gov/nchs/data/dvs/racecodelist.pdf
+FinalsByVote: 1 or 0, whether the person ended up in the finals by the voting public or was put in by the judges
+
+Episodes
+--------
+
+All episodes of American Idol
+
+ID: Unique ID
+Number: Episode number of the season
+Episode: Name of the episode
+Season: self-explanatory
+Air Date: datetime of premiere
+Length: in hours`
+Rating 18-49: Neilson rating in the 18:49 demo
+Viewers: in millions
+Week Rank: Neilson weekly rank
+Finals: 1 or 0, whether this was a finals episode (as opposed to semifinals or auditions)
+FinalistsLeft: number of finalists remaining
+
+Performances
+------------
+
+Instance of a performance on American Idol
+
+ID: Unique ID
+Season: as integer
+Episode: name of the episode
+Theme: the stated theme of the songs in the episode, or "Open" if none was specified
+Order: when in the episode the song was sung (1 through N)
+TotPerfs: How many performances there were (not contestants)
+Song: Name of the song
+Contestant: Name of the contestant as a string
+`WNTS Rating`: WhatNotToSing's ranking, 0 to 100
+`WNTS stdev`: WhatNotToSing's SD, 0 to 100
+Result: as string, the outcome (eliminated, safe, bottom group, saved)
+`Dialidol score`: double holding the Dialidol score for the contestant (note that it will be duplicated on rounds with multiple performances by the same person)
+`Air Date`: datetime
+`Dialidol Votes`: the number of votes Dialidol registered
+`Bottom Prev`: yes or no, whether the person had previously been in the bottom group
+`DIRank`: Dialidol's rank from its score
+`DIVRank`: Dialidol's rank from votes it registered
+NumContestants: Number of contestants in this song's show
+Place: When known, the actual rank of the contestant's vote (this is rarely known)
+`Actual votes`: when known, the actual number of votes in millions
+`Note`: text
+`Original Artist`: ho boy. So this is the original artist of the song the contestant sang. Now, this can get confusing when the person covers a COVER of the song. So if Chris Daughtry does Billie Jean, but he sings it like Chris Cornell does, whom do we designate? In this case, I would designate Cornell, not Michael Jackson.
+VFPercent: Percentage of the vote on Votefair. Taken at the close of the poll.
+BillboardSongs_ID: Unique ID in the BillboardSongs table (for xref purposes)
+Episode_ID: Unique ID in the Episodes table
+Contestant_ID: Unique ID in the Contestants table
+FinalsYesNo: 1 or 0, whether or not it was sung in the finals
+WasGroup: 1 or 0, whether it was part of a group
+
+YearEndLinked
+-------------
+
+Songs in the Yearly Hot 100
+
+Track: Name of the song
+Artist: Who made the record
+YearEnd: What year
+Rank: Position in the yearly Hot 100
+Good: 1 or 0, whether this is objectively a good song
+ID: ID in the BillboardSongs DB
+UniqueID: Primary key for this table
