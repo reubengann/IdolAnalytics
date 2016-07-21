@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+    <title>Interactive Venn</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">    	
+  </head>
+
+  <body> 
+  <script type="text/javascript" src="raphael-min.js"></script>
+  <script type="text/javascript" src="jquery-2.1.0.min.js"></script>
+  <script type="text/javascript" src="scale.raphael.js"></script>  
+  <link rel="stylesheet" type="text/css" href="foo.css">
+  <script class="code" type="text/javascript">
+  
+//Finds the two cartesian coordinates where two circles intersect
+//Stolen shamelessly from http://www.ambrsoft.com/TrigoCalc/Circles2/Circle2.htm
+function calculateIntersection(r1,r2,a1,b1,a2,b2){
+	var IntersectionPoints = new Array();
+	var D = Math.sqrt((a2 - a1) * (a2 - a1) + (b2 - b1) * (b2 - b1));
+	var p = Math.sqrt((D + r1 + r2) * (D + r1 - r2) * (D - r1 + r2) * (-D + r1 + r2)) / 4;
+	var e1 = (a1 + a2) / 2 + (a2 - a1) * (r1 * r1 - r2 * r2) / (2 * D * D);
+	var e2 = (b1 + b2) / 2 + (b2 - b1) * (r1 * r1 - r2 * r2) / (2 * D * D);
+	var x1 = e1 + 2 * (b1 - b2) * p / (D * D);
+	var y1 = e2 - 2 * (a1 - a2) * p / (D * D);
+	var x2 = e1 - 2 * (b1 - b2) * p / (D * D);
+	var y2 = e2 + 2 * (a1 - a2) * p / (D * D);
+	//Intersection coordinates -----------------------------------------------
+	IntersectionPoints[0] = e1 + 2 * (b1 - b2) * p / (D * D);
+	IntersectionPoints[1] = e2 - 2 * (a1 - a2) * p / (D * D);
+	IntersectionPoints[2] = e1 - 2 * (b1 - b2) * p / (D * D);
+	IntersectionPoints[3] = e2 + 2 * (a1 - a2) * p / (D * D);
+	return IntersectionPoints;
+}
+
+
+function draw_tooltip(object, show, text, x, y) {
+	if(show == 0) {
+		popup.remove();
+		popup_txt.remove();
+        transparent_txt.remove();
+		return;
+	}
+	//draw text somewhere to get its dimensions and make it transparent
+	transparent_txt = paper.text(100,100, text).attr({fill: "transparent",font: "10px sans-serif"});
+    
+    //get text dimensions to obtain tooltip dimensions
+	var txt_box = transparent_txt.getBBox();
+
+    //draw text
+	popup_txt = paper.text(x+5, y-txt_box.height/2, text).attr({fill: "black",font: "10px sans-serif","text-anchor":"start"});
+	
+	var bb = popup_txt.getBBox();
+    
+    //draw path for tooltip box
+	popup = paper.path( 
+					"M" + (x-2) + " " + (y+5) +
+					"v" + -(bb.height+10) + 					
+					"h" + (bb.width+10) +					
+					"v" + (bb.height + 10) + 
+					"h" + -(bb.width+10) +
+					"Z").attr( {fill: "yellow"} );
+
+	//finally put the text in front
+	popup_txt.toFront();
+
+}
+
+//subroutine for changeColor
+var pad = function(num, totalChars) {
+    var pad = '0';
+    num = num + '';
+    while (num.length < totalChars) {
+        num = pad + num;
+    }
+    return num;
+};
+
+
+//do not call this function directly. Instead use
+//lighterColor or darkerColor defined directly below
+//this function.
+//changeColor takes a web-formatted color code
+//and makes it lighter or darker based on
+//the input value ratio, where ratio is between 0 and 1
+var changeColor = function(color, ratio, darker) {
+    // Trim trailing/leading whitespace
+    color = color.replace(/^\s*|\s*$/, '');
+
+    // Expand three-digit hex
+    color = color.replace(
+        /^#?([a-f0-9])([a-f0-9])([a-f0-9])$/i,
+        '#$1$1$2$2$3$3'
+    );
+
+    // Calculate ratio
+    var difference = Math.round(ratio * 256) * (darker ? -1 : 1),
+        // Determine if input is RGB(A)
+        rgb = color.match(new RegExp('^rgba?\\(\\s*' +
+            '(\\d|[1-9]\\d|1\\d{2}|2[0-4][0-9]|25[0-5])' +
+            '\\s*,\\s*' +
+            '(\\d|[1-9]\\d|1\\d{2}|2[0-4][0-9]|25[0-5])' +
+            '\\s*,\\s*' +
+            '(\\d|[1-9]\\d|1\\d{2}|2[0-4][0-9]|25[0-5])' +
+            '(?:\\s*,\\s*' +
+            '(0|1|0?\\.\\d+))?' +
+            '\\s*\\)$'
+        , 'i')),
+        alpha = !!rgb && rgb[4] != null ? rgb[4] : null,
+
+        // Convert hex to decimal
+        decimal = !!rgb? [rgb[1], rgb[2], rgb[3]] : color.replace(
+            /^#?([a-f0-9][a-f0-9])([a-f0-9][a-f0-9])([a-f0-9][a-f0-9])/i,
+            function() {
+                return parseInt(arguments[1], 16) + ',' +
+                    parseInt(arguments[2], 16) + ',' +
+                    parseInt(arguments[3], 16);
+            }
+        ).split(/,/),
+        returnValue;
+
+    // Return RGB(A)
+    return !!rgb ?
+        'rgb' + (alpha !== null ? 'a' : '') + '(' +
+            Math[darker ? 'max' : 'min'](
+                parseInt(decimal[0], 10) + difference, darker ? 0 : 255
+            ) + ', ' +
+            Math[darker ? 'max' : 'min'](
+                parseInt(decimal[1], 10) + difference, darker ? 0 : 255
+            ) + ', ' +
+            Math[darker ? 'max' : 'min'](
+                parseInt(decimal[2], 10) + difference, darker ? 0 : 255
+            ) +
+            (alpha !== null ? ', ' + alpha : '') +
+            ')' :
+        // Return hex
+        [
+            '#',
+            pad(Math[darker ? 'max' : 'min'](
+                parseInt(decimal[0], 10) + difference, darker ? 0 : 255
+            ).toString(16), 2),
+            pad(Math[darker ? 'max' : 'min'](
+                parseInt(decimal[1], 10) + difference, darker ? 0 : 255
+            ).toString(16), 2),
+            pad(Math[darker ? 'max' : 'min'](
+                parseInt(decimal[2], 10) + difference, darker ? 0 : 255
+            ).toString(16), 2)
+        ].join('');
+};
+
+//These are the functions you actually call to change color
+//Ratio is between 0 and 1
+var lighterColor = function(color, ratio) {
+    return changeColor(color, ratio, false);
+};
+var darkerColor = function(color, ratio) {
+    return changeColor(color, ratio, true);
+};
+
+//Options
+
+var lineWidth = 2;
+var scale = 1.4;
+var translate = -15;
+var NumberLabelFontsize = "30px";
+var SetCountFontsize = "32px";
+var AreaNumbers = new Array("528","1255","191","57","133","496","270");
+var RightPadding = 80;
+
+//Define the diagram circles.
+
+var centerX = 155+translate;
+var centerY = 131;
+var R1 = 213/2;
+var TopCircleFill = '#BDB9D9';
+var TopCircleStroke = '#E21E25';
+var TopCircleWeight = 2;
+
+var centerX2 = 224+translate;
+var centerY2 = 266
+var R2 = 240/2;
+var RightCircleFill = '#8DD1C5';
+var RightCircleStroke = '#377EB8';
+var RightCircleWeight = 2;
+
+var centerX3 = 127+translate;
+var centerY3 = 184;
+var R3 = 191/2;
+var LowCircleFill = '#FBF6B5';
+var LowCircleStroke = '#4DAE48';
+var widthNeeded = Math.max(centerX+R1,centerX2+R2,centerX3+R3) + 10+translate+RightPadding;
+
+var IntersectionFill12 = '#FBB362';
+var IntersectionFill23 = '#F37E72';
+var IntersectionFill13 = '#80B1D3';
+var IntersectionFill123 = '#B3D56B';
+
+var CategoryHTML = new Array();
+CategoryHTML.push("Oldies only\nExamples:\n"
++"Spiral Starecase - More Today Than Yesterday\n"
++"The Main Ingredient - Everybody Plays the Fool\n"
++"Gladys Knight and the Pips - Midnight Train to Georgia\n"
++"Aretha Franklin - Chain of Fools\n"
++"Al Green - You Ought to Be with Me\n"
++"The Buckinghams - Kind of a Drag\n"
++"Smokey Robinson - I Second That Emotion\n"
++"Tom Jones - It's Not Unusual\n"
++"Stephanie Mills - Never Knew Love Like This Before\n"
++"Isley Brothers - Twist and Shout");
+CategoryHTML.push("Classic Rock only\nExamples:\n"
++"AC/DC - T.N.T\nTriumph - Lay It on the Line\nAerosmith - Back in the Saddle\n"
++"Nazareth - Hair of the Dog\nAC/DC	- Highway to Hell\nStyx	- Blue Collar Man (Long Nights)\n"
++"Foreigner - Long, Long Way From Home\nPink Floyd - Run Like Hell\n"
++"AC/DC - Dirty Deeds Done Dirt Cheap\nThe Who - Squeeze Box\n");
+CategoryHTML.push("Classic Hits only\nExamples:\n"
++"OMD - If You Leave\nStray Cats - Rock This Town\nTears For Fears - Head Over Heels\n"
++"Genesis - Invisible Touch\nTears For Fears - Shout\nCheap Trick - Dream Police\nOutfield - Your Love\n"
++"UB40 - Red Red Wine\nHuey Lewis and The News - I Want a New Drug\nExile - Kiss You All Over");
+CategoryHTML.push("Oldies and Classic Rock\nExamples:\n"
++"Pink Floyd - Money\nDeep Purple - Smoke on the Water\nSantana - Evil Ways\nJimi Hendrix - All Along the Watchtower\n"
++"Journey - Lights\nDavid Bowie - Young Americans\nThe Doors - Riders on the Storm\nDeep Purple - Hush\n"
++"Rolling Stones - Paint It, Black\nThe Who - Won't Get Fooled Again");
+CategoryHTML.push("Classic Rock and Classic Hits\nExamples:\n"
++"Heart - Crazy on You\nBlue Oyster Cult - (Don't Fear) The Reaper\nJourney - Wheel in the Sky\nPat Benatar - Heartbreaker\n"
++"Heart - Barracuda\nREO Speedwagon - Roll with the Changes\nBilly Idol - White Wedding\nBad Company - Feel Like Makin' Love\n"
++"Blue Oyster Cult - Burnin' for You\nAerosmith - Sweet Emotion");
+CategoryHTML.push("Oldies and Classic Hits\nExamples:\n"
++"Frankie Valli - Grease\nBilly Joel - My Life\nFour Seasons - December 1963\nChicago - Saturday in the Park\n"
++"Earth, Wind and Fire - September\nMen At Work - Down Under\nElton John - Crocodile Rock\nDaryl Hall and John Oates - Rich Girl"
++"Wild Cherry - Play That Funky Music\nLooking Glass - Brandy (You're a Fine Girl)");
+CategoryHTML.push("All three stations\nExamples:\n"
++"Manfred Mann - Blinded by the Light\nSupertramp - Give a Little Bit\nEddie Money - Two Tickets to Paradise\n"
++"Bachman-Turner Overdrive - You Ain't Seen Nothin' Yet\nRolling Stones - Miss You\nEddie Money - Baby Hold On\n"
++"War - Low Rider\nBoston - More Than a Feeling\nSteve Miller Band - Rock'n Me\nForeigner - Double Vision");
+
+//scale the values up before we calculate anything.
+centerX = centerX*scale;
+centerY = centerY*scale;
+R1 = R1*scale;
+centerX2 = centerX2*scale;
+centerY2 = centerY2*scale;
+R2 = R2*scale;
+centerX3 = centerX3*scale;
+centerY3 = centerY3*scale;
+R3 = R3*scale;
+
+//Find where the circles meet. Because I do not observe the cycle rule, the drawing code
+//is a bit messier. That is, it would be cleaner to do IntersectionPoints31.
+var IntersectionPoints12 = calculateIntersection(R1,R2,centerX,centerY,centerX2,centerY2);
+var IntersectionPoints23 = calculateIntersection(R2,R3,centerX2,centerY2,centerX3,centerY3);
+var IntersectionPoints13 = calculateIntersection(R1,R3,centerX,centerY,centerX3,centerY3);
+</script>
+
+<div id="paper1"></div>
+
+
+<script type="text/javascript">
+var paper = new ScaleRaphael("paper1", widthNeeded*scale+100, 420*scale);
+$( "#foobar" ).width((widthNeeded*scale+300)+"px");
+
+var TopCircle = paper.circle(centerX, centerY, R1);
+var TopCircleText = paper.text(centerX+10,centerY-85, AreaNumbers[0]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var TopCircleSet = paper.set();
+TopCircleSet.push(TopCircle,TopCircleText);
+TopCircle.attr("fill", TopCircleFill);
+TopCircle.attr("stroke-width",0);
+TopCircleSet.hover(function(){ 
+TopCircle.attr("fill", lighterColor(TopCircleFill,0.1)); draw_tooltip(this, 1, CategoryHTML[0], 100, 400);},function(){ TopCircle.attr("fill", TopCircleFill); draw_tooltip(this,0);});
+paper.text(centerX,centerY-R1-16, "Oldies").attr({"font-size": SetCountFontsize, "font-weight": "400", fill: TopCircleStroke, "font-family": "Arial, Helvetica, sans-serif"});;
+TopCircleSet.attr("cursor","pointer");
+
+var RightCircle = paper.circle(centerX2, centerY2, R2);
+var RightCircleText = paper.text(centerX2+40,centerY2+16, AreaNumbers[1]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var RightCircleSet = paper.set();
+RightCircleSet.push(RightCircle,RightCircleText);
+RightCircle.attr("fill", RightCircleFill);
+RightCircle.attr("stroke-width",0);
+RightCircleSet.hover(function(){ RightCircle.attr("fill", lighterColor(RightCircleFill,0.1)); draw_tooltip(this, 1, CategoryHTML[1], 250, 175);},function(){ RightCircle.attr("fill", RightCircleFill); draw_tooltip(this,0);});
+paper.text(centerX2,centerY2+R2+15, "Classic Rock").attr({"font-size": SetCountFontsize, "font-weight": "400", fill: RightCircleStroke, "font-family": "Arial, Helvetica, sans-serif"});;
+RightCircleSet.attr("cursor","pointer");
+
+var LowCircle = paper.circle(centerX3, centerY3, R3);
+var LowCircleText = paper.text(centerX3-75,centerY3+60, AreaNumbers[2]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var LowCircleSet = paper.set();
+LowCircleSet.push(LowCircle,LowCircleText);
+LowCircle.attr("fill", LowCircleFill);
+LowCircle.attr("stroke-width",0);
+LowCircleSet.hover(function(){ LowCircle.attr("fill", lighterColor(LowCircleFill,0.1)); draw_tooltip(this, 1, CategoryHTML[2], 60, 175);},function(){ LowCircle.attr("fill", LowCircleFill); draw_tooltip(this,0);});
+paper.text(centerX3-85,centerY3+R3+26, "Classic\nHits").attr({"font-size": SetCountFontsize, "font-weight": "400", fill: LowCircleStroke, "font-family": "Arial, Helvetica, sans-serif"});;
+LowCircleSet.attr("cursor","pointer");
+
+var OverlapLens12 = paper.path("M"+IntersectionPoints12[0]+","+IntersectionPoints12[1]+" a"+(R1)+","+(R1)+" 0 0,0 "
++(IntersectionPoints12[2]-IntersectionPoints12[0])+","+(IntersectionPoints12[3]-IntersectionPoints12[1])+" a"+(R2)+","+(R2)+" 0 0,0 "
++(IntersectionPoints12[0]-IntersectionPoints12[2])+","+(IntersectionPoints12[1]-IntersectionPoints12[3])+" z");
+var OverlapLens12Text = paper.text((IntersectionPoints12[0]+IntersectionPoints12[2])/2+70,(IntersectionPoints12[1]+IntersectionPoints12[3])/2-30, AreaNumbers[3]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var OverlapLens12Set = paper.set();
+OverlapLens12Set.push(OverlapLens12,OverlapLens12Text);
+OverlapLens12.attr("fill", IntersectionFill12);
+OverlapLens12.attr("stroke-width", 0);
+OverlapLens12Set.hover(function(){ OverlapLens12.attr("fill", lighterColor(IntersectionFill12,0.1)); draw_tooltip(this, 1, CategoryHTML[3], 60, 175);},function(){ OverlapLens12.attr("fill", IntersectionFill12); draw_tooltip(this,0);});
+OverlapLens12Set.attr("cursor","pointer");
+
+var OverlapLens23 = paper.path("M"+IntersectionPoints23[0]+","+IntersectionPoints23[1]+" a"+(R2)+","+(R2)+" 0 0,0 "
++(IntersectionPoints23[2]-IntersectionPoints23[0])+","+(IntersectionPoints23[3]-IntersectionPoints23[1])+" a"+(R3)+","+(R3)+" 0 0,0 "
++(IntersectionPoints23[0]-IntersectionPoints23[2])+","+(IntersectionPoints23[1]-IntersectionPoints23[3])+" z");
+var OverlapLens23Text = paper.text((IntersectionPoints23[0]+IntersectionPoints23[2])/2-15,(IntersectionPoints23[1]+IntersectionPoints23[3])/2+58, AreaNumbers[4]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var OverlapLens23Set = paper.set();
+OverlapLens23Set.push(OverlapLens23,OverlapLens23Text);
+OverlapLens23.attr("fill", IntersectionFill23);
+OverlapLens23.attr("stroke-width", 0);
+OverlapLens23Set.hover(function(){ OverlapLens23.attr("fill", lighterColor(IntersectionFill23,0.1));  draw_tooltip(this, 1, CategoryHTML[4], 60, 175);},function(){ OverlapLens23.attr("fill", IntersectionFill23);  draw_tooltip(this,0);});
+OverlapLens23Set.attr("cursor","pointer");
+
+/*Technically, this coming code should be run on all the intersections. However, even if it were, this
+//code is not sufficient to totally determine the system. If, for instance, the lower part
+//of set 1 goes below the cusp between sets 2 and 3, an erroneous area will be colored in 
+OverlapTriangle. I just assume the sets will be well-defined.*/
+
+/*In any case, what this does is try to determine whether we need to take the large-arc
+or the short arc generated by the subtended angle between intersection points. For a large
+set overlap this is important.*/
+var largearc = 0;
+var angle1 = Math.PI - Math.atan((IntersectionPoints13[1]-centerY3)/(IntersectionPoints13[0]-centerX3));
+var angle2 = Math.atan((IntersectionPoints13[3]-centerY3)/(IntersectionPoints13[2]-centerX3));
+if( angle1 + angle2 > Math.PI) //greater than 180 on the outside means we want the large-arc
+{	
+	largearc = 1;
+}
+
+var OverlapLens13 = paper.path("M"+IntersectionPoints13[0]+","+IntersectionPoints13[1]+" a"+(R1)+","+(R1)+" 0 0,0 "
++(IntersectionPoints13[2]-IntersectionPoints13[0])+","+(IntersectionPoints13[3]-IntersectionPoints13[1])+" a"+(R3)+","+(R3)+" 0 "+(largearc)+",0 "
++(IntersectionPoints13[0]-IntersectionPoints13[2])+","+(IntersectionPoints13[1]-IntersectionPoints13[3])+" z");
+var OverlapLens13Text = paper.text((IntersectionPoints13[0]+IntersectionPoints13[2])/2-30,(IntersectionPoints13[1]+IntersectionPoints13[3])/2-35, AreaNumbers[5]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var OverlapLens13Set = paper.set();
+OverlapLens13Set.push(OverlapLens13,OverlapLens13Text);
+OverlapLens13.attr("fill", IntersectionFill13);
+OverlapLens13.attr("stroke-width", 0);
+OverlapLens13Set.hover(function(){ OverlapLens13.attr("fill", lighterColor(IntersectionFill13,0.1));  draw_tooltip(this, 1, CategoryHTML[5], 60, 475);},function(){ OverlapLens13.attr("fill", IntersectionFill13);  draw_tooltip(this,0);});
+OverlapLens13Set.attr("cursor","pointer");
+
+//This is where it would have been nice to have observed the cycle rule. Instead of going from [0,1] points for all curves I have to go to to
+// [2,3] on one of them.
+var OverlapTriangle = paper.path("M"+IntersectionPoints23[0]+","+IntersectionPoints23[1]
++" a"+R2+","+R2+" 0 0,0 "
++(IntersectionPoints12[0]-IntersectionPoints23[0])+","+(IntersectionPoints12[1]-IntersectionPoints23[1])
++" a"+R1+","+R1+" 0 0,0 "
++(IntersectionPoints13[2]-IntersectionPoints12[0])+","+(IntersectionPoints13[3]-IntersectionPoints12[1])
++" a"+R3+","+R3+" 0 0,0 "
++(IntersectionPoints23[0]-IntersectionPoints13[2])+","+(IntersectionPoints23[1]-IntersectionPoints13[3])
++ " z");
+var OverlapTriangleText = paper.text((IntersectionPoints12[0]+IntersectionPoints23[0])/2+20,(IntersectionPoints12[1]+IntersectionPoints23[1])/2+10, AreaNumbers[6]).attr({"font-size": NumberLabelFontsize, "font-weight": "400", fill: "black", "font-family": "Arial, Helvetica, sans-serif"});;
+var margin = -2;
+var transparentBox = paper.rect((margin/2)+OverlapTriangleText.attr("x")-OverlapTriangleText.getBBox().width/2,(margin/2)+OverlapTriangleText.attr("y")-OverlapTriangleText.getBBox().height/2,OverlapTriangleText.getBBox().width-margin,OverlapTriangleText.getBBox().height-margin).attr({
+    'stroke': 'black', 
+    'fill': 'white',
+    'fill-opacity': 0,
+    'stroke-width': 0
+});
+var OverlapTriangleSet = paper.set();
+OverlapTriangleSet.push(OverlapTriangle,OverlapTriangleText,transparentBox);
+OverlapTriangle.attr("fill", IntersectionFill123);
+OverlapTriangle.attr("stroke-width", 0);
+OverlapTriangleSet.hover(function(){ OverlapTriangle.attr("fill", lighterColor(IntersectionFill123,0.1)); /*$("#tooltip").html(CategoryHTML[6]);*/draw_tooltip(this, 1, CategoryHTML[6], 60, 500);},function(){ OverlapTriangle.attr("fill", IntersectionFill123); $("#tooltip").html(""); draw_tooltip(this,0);});
+OverlapTriangleSet.attr("cursor","pointer");
+
+//Draw the outlines last so that they aren't covered by fills
+var TopCircleOut = paper.circle(centerX, centerY, R1);
+TopCircleOut.attr("stroke", TopCircleStroke);
+TopCircleOut.attr("stroke-width",TopCircleWeight);
+
+var RightCircleOut = paper.circle(centerX2, centerY2, R2);
+RightCircleOut.attr("stroke", RightCircleStroke);
+RightCircleOut.attr("stroke-width",RightCircleWeight);
+
+var LowCircleOut = paper.circle(centerX3, centerY3, R3);
+LowCircleOut.attr("stroke", LowCircleStroke);
+LowCircleOut.attr("stroke-width",2);
+
+OverlapTriangleText.toFront();
+transparentBox.toFront();
+RightCircleText.toFront();
+OverlapLens13Text.toFront();
+OverlapLens12Text.toFront();
+OverlapLens23Text.toFront();
+
+function resizePaper(){
+  var win = $(this);
+  paper.changeSize(win.width(), win.height(), false, false);
+}
+resizePaper();
+$(window).resize(resizePaper);
+</script>
+
+</body></html>

@@ -8,6 +8,9 @@ documentation of the database.
 
 HighCharts - Examples of data visualization using the Highcharts package
 
+InteractiveVenn - Example of how to make an interactive 3-set Venn diagram
+using RaphaelJS
+
 ModelCode - Code to iteratively determine model coefficients and calculate
 projected probabilities
 
